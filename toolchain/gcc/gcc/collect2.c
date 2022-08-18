@@ -144,6 +144,63 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #define SCAN_LIBRARIES
 #endif
 
+#ifdef __MINGW32__
+/* We are being compiled with mingw32 as host, so we should prepare some
+   win32 replaces for pipe(), kill(getpid(),...) and vfork() + execv()
+*/
+#include <io.h>
+#include <fcntl.h>
+
+#define pipe(fildes) _pipe((fildes),1024*16,_O_BINARY)
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+int vfork_execv(char *cmdname, char **argv, int fdout);
+
+/* Helper function for vfork() + execv() replacement. */
+int vfork_execv(char *cmdname, char **argv, int fdout)
+{
+	STARTUPINFO SI;
+	PROCESS_INFORMATION PI;
+	char *params;
+	int plen = 0;
+	int i;
+	BOOL bRes;
+
+	/* Prepare one line with arguments */
+	for(i=0;argv[i];i++) plen += strlen(argv[i]) + 1;
+	plen++;
+	params = xmalloc(plen);
+	strcpy(params,argv[0]);
+	for(i=1;argv[i];i++)  strcat(strcat(params," "),argv[i]);
+
+	/* Prepare startup info -- for pipes redirection */
+	memset(&SI,0,sizeof(SI));
+	SI.cb = sizeof(SI);
+	SI.dwFlags = STARTF_USESTDHANDLES;
+	SI.hStdInput  = GetStdHandle(STD_INPUT_HANDLE);
+	SI.hStdOutput = (HANDLE)_get_osfhandle(fdout);
+	SI.hStdError  = GetStdHandle(STD_ERROR_HANDLE);
+
+	/* Create new process in same console, with redirected (piped) stdout */
+	bRes = CreateProcess(cmdname,params,
+		NULL,NULL,	/* Security attributes */
+		FALSE,		/* Handle inheritance */
+		0,			/* Flags -- default, in this console, etc */
+		NULL,		/* Invironment */
+		NULL,		/* CWD */
+		&SI,		/* Startup info */
+		&PI);		/* Process info */
+	if(!bRes) return -1;
+	CloseHandle(PI.hProcess);
+	CloseHandle(PI.hThread);
+	return 0;
+}
+
+/* END-OF-WIN32-SECTION */
+#endif
+
 #ifdef USE_COLLECT2
 int do_collecting = 1;
 #else
@@ -424,7 +481,11 @@ handler (int signo)
 #endif
 
   signal (signo, SIG_DFL);
+#ifndef __MINGW32__
   kill (getpid (), signo);
+#else
+  ExitProcess(signo);
+#endif
 }
 
 
@@ -2036,6 +2097,7 @@ scan_prog_file (const char *prog_name, enum pass which_pass)
   fflush (stderr);
 
   /* Spawn child nm on pipe.  */
+#ifndef __MINGW32__
   pid = vfork ();
   if (pid == -1)
     fatal_perror (VFORK_STRING);
@@ -2055,6 +2117,11 @@ scan_prog_file (const char *prog_name, enum pass which_pass)
       execv (nm_file_name, real_nm_argv);
       fatal_perror ("execv %s", nm_file_name);
     }
+#else
+  if(vfork_execv(nm_file_name, real_nm_argv, pipe_fd[1])) {
+      fatal_perror ("vfork+execv %s", nm_file_name);
+  }
+#endif
 
   /* Parent context from here on.  */
   int_handler  = (void (*) (int)) signal (SIGINT,  SIG_IGN);
@@ -2465,6 +2532,7 @@ scan_libraries (const char *prog_name)
   fflush (stderr);
 
   /* Spawn child ldd on pipe.  */
+#ifndef __MINGW32__
   pid = vfork ();
   if (pid == -1)
     fatal_perror (VFORK_STRING);
@@ -2484,6 +2552,11 @@ scan_libraries (const char *prog_name)
       execv (ldd_file_name, real_ldd_argv);
       fatal_perror ("execv %s", ldd_file_name);
     }
+#else
+  if(vfork_execv(ldd_file_name, real_ldd_argv, pipe_fd[1])) {
+      fatal_perror ("vfork+execv %s", nm_file_name);
+  }
+#endif
 
   /* Parent context from here on.  */
   int_handler  = (void (*) (int)) signal (SIGINT,  SIG_IGN);
