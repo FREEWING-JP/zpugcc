@@ -122,7 +122,7 @@ install-scripts:
 	   t='$(program_transform_name)'; \
 	   objdump=`echo objdump | sed -e $$t`; \
 	fi ; \
-	name=`$$objdump -f $(CRT0) | sed '/^$$/d'`; 
+	name=`$$objdump -f $(CRT0) | sed '/^$$/d'`; \
 	name=`$$objdump -f $(IO) | sed '/^$$/d'`; 
 
 doc:
