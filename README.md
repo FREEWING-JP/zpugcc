@@ -1,3 +1,12 @@
+## 32bitマイコン Zylin CPUの ZPU用の GCC toolchainを WSL環境でビルドする方法
+(How to build Zylin ZPU's GCC toolchain with Windows WSL)  
+http://www.neko.ne.jp/~freewing/fpga/zpu_soft_core_build_zpu_gcc_toolchain/  
+
+## Environment
+* Windows 10 WSL Windows Subsystem for Linux
+* Raspberry Pi OS Lite Release date: April 4th 2022 32-bit
+
+--- 
 # zpugcc
 
 This repository contain the gcc, which is adapted for https://github.com/zylin/zpu CPU,
