@@ -4,7 +4,11 @@ __inline
 #endif
 static unsigned int hash (const char *, unsigned int);
 #ifdef __GNUC__
+#ifdef __GNUC_STDC_INLINE__
+__attribute__ ((__gnu_inline__))
+#else
 __inline
+#endif
 #endif
 const char * libc_name_p (const char *, unsigned int);
 %}
